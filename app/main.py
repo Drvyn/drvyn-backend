@@ -22,6 +22,7 @@ app.add_middleware(
     allow_origins=[
         "https://www.drvyn.in",
         "https://caragecarcare.vercel.app",
+        "https://drvyn-frontend.vercel.app  ",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",

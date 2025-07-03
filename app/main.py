@@ -21,12 +21,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://www.drvyn.in",
-        "https://caragecarcare.vercel.app",
         "https://drvyn-frontend.vercel.app  ",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
-        "https://caragecarcare.onrender.com",
+        "https://drvyn-backend.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -50,7 +49,7 @@ async def keep_alive():
     while True:
         try:
             async with httpx.AsyncClient() as client:
-                await client.get("https://caragecarcare-backend.onrender.com")
+                await client.get("https://drvyn-backend.onrender.com")
             logger.info("Keep-alive ping successful")
         except Exception as e:
             logger.error(f"Keep-alive ping failed: {e}")

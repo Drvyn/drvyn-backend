@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: carbrands-backend
+    name: drvyn-backend
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
     envVars:
       - key: MONGODB_URI
-        value: mongodb+srv://vodintech:ia7m4AaQ8TlMyWid@cluster0.ratvxur.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+        value: mongodb+srv://drvynin:y3WC396ehtHraxQo@drvyn.tvqibqf.mongodb.net/?retryWrites=true&w=majority&appName=Drvyn
       - key: DB_NAME
         value: carbrands

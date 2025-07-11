@@ -28,7 +28,7 @@ class BookingRequest(BaseModel):
     serviceCenter: str
     totalPrice: float
     cartItems: List[BookingItem]
-    status: str = "pending"  # Default status
+    status: str = "pending"  
     
 @router.post("/submit-booking")
 async def submit_booking(booking: BookingRequest):
@@ -40,8 +40,8 @@ async def submit_booking(booking: BookingRequest):
             raise HTTPException(status_code=500, detail="Database connection error")
             
         booking_data = booking.dict()
-        booking_data["createdAt"] = datetime.utcnow()
-        booking_data["updatedAt"] = datetime.utcnow()
+        booking_data["createdAt"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        booking_data["updatedAt"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         
         # Insert the booking into MongoDB
         result = db.bookings.insert_one(booking_data)

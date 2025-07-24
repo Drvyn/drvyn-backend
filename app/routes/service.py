@@ -20,15 +20,6 @@ class ServicePackage(BaseModel):
     recommended: Optional[bool] = False
     category: Optional[str] = None
 
-@router.get("/service-categories")
-async def get_service_categories():
-    try:
-        categories = list(db.service_categories.find({}, {"_id": 0, "name": 1, "icon": 1}))
-        return categories
-    except Exception as e:
-        logger.error(f"Error getting categories: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/service-packages")
 async def get_service_packages(
     category: str = Query(...),
@@ -71,10 +62,17 @@ async def get_service_packages(
                     "discountedPrice": price
                 }
             else:
+                # Get regular price
+                regular_price = pkg["prices"].get(fuel_type, pkg["prices"].get("Petrol", 0))
+                
+                # Get discounted price - looking for discountedPetrol or discountedDiesel
+                discounted_price_key = f"discounted{fuel_type}"
+                discounted_price = pkg["prices"].get(discounted_price_key, regular_price)
+                
                 transformed = {
                     **pkg,
-                    "price": pkg["prices"].get("Petrol", 0),  # Default price
-                    "discountedPrice": pkg["prices"].get(fuel_type, pkg["prices"].get("Petrol", 0))
+                    "price": regular_price,
+                    "discountedPrice": discounted_price
                 }
             transformed_packages.append(transformed)
             

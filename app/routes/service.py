@@ -22,7 +22,8 @@ class ServicePackage(BaseModel):
     recommended: Optional[bool] = False
     category: Optional[str] = None
     pricing: dict
-    Extra: Optional[dict] = None
+    Extra: Optional[str] = None  
+    Extra1: Optional[str] = None 
 
 @router.get("/service-packages")
 async def get_service_packages(
@@ -101,7 +102,8 @@ async def get_service_packages(
                     **pkg,
                     "price": price,
                     "discountedPrice": discounted_price,
-                    "Extra": fuel_data.get("Extra", "") 
+                    "Extra": fuel_data.get("Extra", ""),
+                    "Extra1": fuel_data.get("Extra1", "") 
                 }
                 transformed_packages.append(transformed)
                 logger.info(f"Included package: {pkg['name']} for {brand} {model} ({fuel_type})")

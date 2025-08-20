@@ -1,4 +1,3 @@
-# booking.py
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from typing import Dict, List
@@ -29,7 +28,16 @@ class BookingRequest(BaseModel):
     totalPrice: float
     cartItems: List[BookingItem]
     status: str = "pending"  
-    
+
+class InsuranceClaimRequest(BaseModel):
+    brand: str
+    model: str
+    fuelType: str
+    year: str
+    phone: str
+    companyPolicyName: str 
+    createdAt: str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")   
+
 @router.post("/submit-booking")
 async def submit_booking(booking: BookingRequest):
     try:
@@ -73,4 +81,31 @@ async def get_bookings(phone: str = None):
         
     except Exception as e:
         logger.error(f"Error fetching bookings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/submit-insurance-request")
+async def submit_insurance_request(request: InsuranceClaimRequest):
+    try:
+        logger.info(f"Received insurance request: {request.dict()}")
+        
+        if db is None:
+            logger.error("Database connection not initialized")
+            raise HTTPException(status_code=500, detail="Database connection error")
+            
+        request_data = request.dict()
+        request_data["type"] = "insurance_request"
+        request_data["status"] = "new"
+        
+        # Insert into a separate collection
+        result = db.insurance_requests.insert_one(request_data)
+        
+        return {
+            "success": True,
+            "requestId": str(result.inserted_id),
+            "message": "Insurance request submitted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error submitting insurance request: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import logging
 from bson import ObjectId
 from app.database.connection import db 
-
+ 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

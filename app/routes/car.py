@@ -10,9 +10,13 @@ from datetime import datetime
 from pathlib import Path
 import logging
 import re
+import pytz
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Define IST time zone
+IST_TZ = pytz.timezone('Asia/Kolkata')
 
 def normalize_name(name: str) -> str:
     """Convert to lowercase and replace spaces with underscores"""
@@ -181,7 +185,7 @@ async def submit_request(request: CarRequest, response: Response):
             "fuelType": request.fuelType,
             "year": request.year,
             "phone": request.phone,
-            "createdAt": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            "createdAt": datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")  
 
         }
         response.headers["Access-Control-Allow-Origin"] = "*"

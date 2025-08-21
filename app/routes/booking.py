@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
+import pytz
 from typing import Dict, List
 from pydantic import BaseModel
 import logging
@@ -8,6 +9,9 @@ from app.database.connection import db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Define IST time zone
+IST_TZ = pytz.timezone('Asia/Kolkata')
 
 class BookingItem(BaseModel):
     packageName: str
@@ -27,7 +31,7 @@ class BookingRequest(BaseModel):
     serviceCenter: str
     totalPrice: float
     cartItems: List[BookingItem]
-    status: str = "pending"  
+    status: str = "pending"
 
 class InsuranceClaimRequest(BaseModel):
     brand: str
@@ -35,8 +39,8 @@ class InsuranceClaimRequest(BaseModel):
     fuelType: str
     year: str
     phone: str
-    companyPolicyName: str 
-    createdAt: str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")   
+    companyPolicyName: str
+    createdAt: str = datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")  
 
 @router.post("/submit-booking")
 async def submit_booking(booking: BookingRequest):
@@ -48,8 +52,8 @@ async def submit_booking(booking: BookingRequest):
             raise HTTPException(status_code=500, detail="Database connection error")
             
         booking_data = booking.dict()
-        booking_data["createdAt"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        booking_data["updatedAt"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        booking_data["createdAt"] = datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")  
+       # booking_data["updatedAt"] = datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")  
         
         # Insert the booking into MongoDB
         result = db.bookings.insert_one(booking_data)
@@ -82,7 +86,6 @@ async def get_bookings(phone: str = None):
     except Exception as e:
         logger.error(f"Error fetching bookings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    
 
 @router.post("/submit-insurance-request")
 async def submit_insurance_request(request: InsuranceClaimRequest):
@@ -96,6 +99,7 @@ async def submit_insurance_request(request: InsuranceClaimRequest):
         request_data = request.dict()
         request_data["type"] = "insurance_request"
         request_data["status"] = "new"
+        request_data["createdAt"] = datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")  
         
         # Insert into a separate collection
         result = db.insurance_requests.insert_one(request_data)

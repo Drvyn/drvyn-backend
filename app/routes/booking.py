@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from datetime import datetime
 import pytz
 from typing import Dict, List
@@ -6,6 +6,8 @@ from pydantic import BaseModel
 import logging
 from bson import ObjectId
 from app.database.connection import db 
+from app.services.email_service import email_service
+import os
  
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -113,3 +115,37 @@ async def submit_insurance_request(request: InsuranceClaimRequest):
     except Exception as e:
         logger.error(f"Error submitting insurance request: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/submit-booking")
+async def submit_booking(booking: BookingRequest, background_tasks: BackgroundTasks):
+    try:
+        logger.info(f"Received booking data: {booking.dict()}")
+        
+        if db is None:
+            logger.error("Database connection not initialized")
+            raise HTTPException(status_code=500, detail="Database connection error")
+            
+        booking_data = booking.dict()
+        booking_data["createdAt"] = datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Insert the booking into MongoDB
+        result = db.bookings.insert_one(booking_data)
+        
+        # Send email notification in background
+        admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+        if admin_emails and admin_emails[0]:
+            background_tasks.add_task(
+                email_service.send_booking_notification, 
+                booking_data, 
+                admin_emails
+            )
+        
+        return {
+            "success": True,
+            "bookingId": str(result.inserted_id),
+            "message": "Booking submitted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error submitting booking: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))    

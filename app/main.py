@@ -5,6 +5,7 @@ from app.routes.car import router as car_router
 from app.config import settings
 from app.routes.service import router as service_router
 from app.routes.booking import router as booking_router
+from app.routes.admin import router as admin_router
 from fastapi import BackgroundTasks
 import httpx
 import asyncio
@@ -23,8 +24,11 @@ app.add_middleware(
     allow_origins=[
         "https://www.drvyn.in",
         "https://drvyn-frontend.vercel.app",
+        "https://drvyn-dashboard.vercel.app",
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://localhost:8000",
     ],
     allow_credentials=True,
@@ -63,6 +67,7 @@ async def startup_event():
 app.include_router(car_router, prefix="/car", tags=["Car"])
 app.include_router(service_router, prefix="/api")
 app.include_router(booking_router, prefix="/api", tags=["Booking"]) 
+app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
 @app.get("/")
 def root():

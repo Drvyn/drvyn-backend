@@ -23,6 +23,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://www.drvyn.in",
+        "https://crm.drvyn.in",
         "https://drvyn-frontend.vercel.app",
         "https://drvyn-dashboard.vercel.app",
         "http://localhost:3000",

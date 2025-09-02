@@ -8,6 +8,7 @@ from bson import ObjectId
 import bcrypt
 from app.database.connection import db
 import os
+from dotenv import load_dotenv
 
 router = APIRouter()
 security = HTTPBearer()
@@ -26,11 +27,11 @@ class StatusUpdate(BaseModel):
 # Create admin user if not exists
 def create_initial_admin():
     try:
-        admin_exists = db.admin_users.find_one({"username": "admin"})
+        admin_exists = db.admin_users.find_one({"username": os.getenv('ADMIN_USERMANE')})
         if not admin_exists:
-            hashed_password = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt())
+            hashed_password = bcrypt.hashpw(os.getenv('ADMIN_PASSWORD').encode('utf-8'), bcrypt.gensalt())
             db.admin_users.insert_one({
-                "username": "admin",
+                "username": os.getenv('ADMIN_USERMANE'),
                 "password": hashed_password,
                 "role": "admin",
                 "createdAt": datetime.now()

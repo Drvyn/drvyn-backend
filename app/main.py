@@ -22,6 +22,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://drvyn.in",
         "https://www.drvyn.in",
         "https://crm.drvyn.in",
         "https://drvyn-frontend.vercel.app",

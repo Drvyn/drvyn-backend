@@ -6,6 +6,7 @@ from app.config import settings
 from app.routes.service import router as service_router
 from app.routes.booking import router as booking_router
 from app.routes.admin import router as admin_router
+from app.routes.blog import router as blog_router
 from fastapi import BackgroundTasks
 import httpx
 import asyncio 
@@ -70,6 +71,7 @@ app.include_router(car_router, prefix="/car", tags=["Car"])
 app.include_router(service_router, prefix="/api")
 app.include_router(booking_router, prefix="/api", tags=["Booking"]) 
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
+app.include_router(blog_router)
 
 @app.get("/")
 def root():

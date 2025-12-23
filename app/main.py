@@ -7,6 +7,9 @@ from app.routes.service import router as service_router
 from app.routes.booking import router as booking_router
 from app.routes.admin import router as admin_router
 from app.routes.blog import router as blog_router
+from fastapi import BackgroundTasks
+import httpx
+import asyncio 
 import os
 import logging
 
@@ -16,6 +19,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 # CORS Configuration
+# In main.py
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -36,16 +40,17 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# FIXED: Removed os.makedirs. Vercel is Read-Only.
-# You must use S3, Cloudinary, or Vercel Blob for storage instead of local folders.
+# Create media directories if they don't exist
+os.makedirs(settings.MEDIA_ROOT / "brands", exist_ok=True)
+os.makedirs(settings.MEDIA_ROOT / "models", exist_ok=True)
+os.makedirs(settings.MEDIA_ROOT / "fuels", exist_ok=True)
 
-# Serve static files (Note: This will only work for files already in your Git repo)
-if os.path.exists(settings.MEDIA_ROOT):
-    app.mount(
-        str(settings.MEDIA_URL),
-        StaticFiles(directory=settings.MEDIA_ROOT),
-        name="media"
-    )
+# Serve static files
+app.mount(
+    str(settings.MEDIA_URL),
+    StaticFiles(directory=settings.MEDIA_ROOT),
+    name="media"
+)
 
 # Include routes
 app.include_router(car_router, prefix="/car", tags=["Car"])
@@ -56,6 +61,12 @@ app.include_router(blog_router)
 
 @app.get("/")
 def root():
-    return {"status": "API is running on Vercel", "database": "Connected"}
+    return {"status": "API is running"}
 
-# FIXED: Removed duplicate root routes and the keep_alive startup task.
+logger.info(f"📁 Media root: {settings.MEDIA_ROOT}")
+logger.info(f"🌐 Media URL: {settings.MEDIA_URL}")
+
+app.include_router(service_router)
+@app.get("/")
+def read_root():
+    return {"message": "Service Hierarchy API is running"}

@@ -20,7 +20,7 @@ MEDIA_URL = "/media/"
 class Settings:
     MONGODB_URI = MONGODB_URI
     DB_NAME = DB_NAME
-    MEDIA_ROOT = MEDIA_ROOT
-    MEDIA_URL = MEDIA_URL
+    MEDIA_ROOT = BASE_DIR / "media"
+    MEDIA_URL = "/media"
 
 settings = Settings()

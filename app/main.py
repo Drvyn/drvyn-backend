@@ -39,17 +39,13 @@ app.add_middleware(
 # FIXED: Removed os.makedirs. Vercel is Read-Only.
 # You must use S3, Cloudinary, or Vercel Blob for storage instead of local folders.
 
-os.makedirs(settings.MEDIA_ROOT / "brands", exist_ok=True)
-os.makedirs(settings.MEDIA_ROOT / "models", exist_ok=True)
-os.makedirs(settings.MEDIA_ROOT / "fuels", exist_ok=True)
-
-# Serve static files (Note: This will only work for files already in your Git repo)
 if os.path.exists(settings.MEDIA_ROOT):
     app.mount(
-        str(settings.MEDIA_URL),
-        StaticFiles(directory=settings.MEDIA_ROOT),
+        str(settings.MEDIA_URL), 
+        StaticFiles(directory=str(settings.MEDIA_ROOT)), 
         name="media"
     )
+    logger.info(f"Media mounted at {settings.MEDIA_ROOT}")
 
 # Include routes
 app.include_router(car_router, prefix="/car", tags=["Car"])

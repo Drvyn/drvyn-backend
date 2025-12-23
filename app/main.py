@@ -52,16 +52,6 @@ app.mount(
     name="media"
 )
 
-async def keep_alive():
-    while True:
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.get("https://drvyn-backend.onrender.com")
-            logger.info("Keep-alive ping successful")
-        except Exception as e:
-            logger.error(f"Keep-alive ping failed: {e}")
-        await asyncio.sleep(60)  # Ping every # minutes
-
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(keep_alive())

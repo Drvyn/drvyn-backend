@@ -184,8 +184,6 @@ async def update_insurance_request_status(
     except:
         raise HTTPException(status_code=400, detail="Invalid insurance request ID")
 
-# --- CAR REQUESTS ENDPOINTS ---
-
 @router.get("/car-requests")
 async def get_car_requests(
     skip: int = 0, 
@@ -198,13 +196,11 @@ async def get_car_requests(
     
     for req in requests:
         req["_id"] = str(req["_id"])
-        # Handle old records missing 'status'
         if "status" not in req:
             req["status"] = "new"
         
     return {"requests": requests, "total": total}
 
-# THIS IS THE ENDPOINT THAT WAS MISSING OR NOT DEPLOYED
 @router.put("/car-requests/{request_id}/status")
 async def update_car_request_status(
     request_id: str, 
@@ -225,13 +221,60 @@ async def update_car_request_status(
         print(f"Error updating request: {e}")
         raise HTTPException(status_code=400, detail="Invalid request ID")
 
+# --- CUSTOMER ENDPOINT (Updated to match TS Interface) ---
+@router.get("/customers")
+def get_customers(current_admin: dict = Depends(get_current_admin)):
+    try:
+        # Aggregation pipeline to group by phone number
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$phone",
+                    "phone": {"$first": "$phone"},
+                    "totalBookings": {"$sum": 1},
+                    # Assumes totalPrice is stored as a number in MongoDB
+                    "totalSpent": {"$sum": "$totalPrice"},
+                    "lastSeen": {"$max": "$createdAt"},
+                    # Collect unique vehicles
+                    "vehicles": {
+                        "$addToSet": {
+                            "brand": "$brand",
+                            "model": "$model",
+                            "year": "$year"
+                        }
+                    },
+                    # Grab the most recent address found
+                    "address": {"$first": "$address"}
+                }
+            },
+            {"$sort": {"lastSeen": -1}}
+        ]
+        
+        customers_cursor = db.bookings.aggregate(pipeline)
+        customers = []
+        
+        for doc in customers_cursor:
+            customers.append({
+                "phone": doc["phone"],
+                "name": "Valued Customer", # Placeholder since we don't have separate user names
+                "totalBookings": doc["totalBookings"],
+                "totalRequests": 0, # Placeholder (would require lookup on requests collection)
+                "lastSeen": doc["lastSeen"],
+                "vehicles": doc["vehicles"],
+                "address": doc.get("address", "")
+            })
+            
+        return {"customers": customers}
+    except Exception as e:
+        print(f"Error fetching customers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/dashboard/stats")
 def get_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
     total_bookings = db.bookings.count_documents({})
     pending_bookings = db.bookings.count_documents({"status": "pending"})
     completed_bookings = db.bookings.count_documents({"status": "completed"})
     
-    # Calculate revenue
     pipeline = [
         {"$match": {"status": "completed"}},
         {"$group": {"_id": None, "totalRevenue": {"$sum": "$totalPrice"}}}

@@ -128,6 +128,7 @@ async def get_booking(booking_id: str, current_admin: dict = Depends(get_current
 async def update_booking_status(
     booking_id: str, 
     status_update: StatusUpdate,
+    current_admin: dict = Depends(get_current_admin) # Added security dependency
 ):
     try:
         result = db.bookings.update_one(
@@ -136,11 +137,15 @@ async def update_booking_status(
         )
         
         if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="Booking not found")
+            # Check if it matched but didn't modify (same status)
+            matched = db.bookings.count_documents({"_id": ObjectId(booking_id)})
+            if matched == 0:
+                 raise HTTPException(status_code=404, detail="Booking not found")
             
         return {"message": "Status updated successfully"}
-    except:
-        raise HTTPException(status_code=400, detail="Invalid booking ID")
+    except Exception as e:
+        print(f"Error updating status: {str(e)}") # Helpful for Vercel logs
+        raise HTTPException(status_code=400, detail="Invalid booking ID or database error")
 
 @router.get("/insurance-requests")
 async def get_insurance_requests(

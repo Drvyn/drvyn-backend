@@ -25,8 +25,9 @@ class ServicePackage(BaseModel):
     Extra: Optional[str] = None  
     Extra1: Optional[str] = None 
 
+
 @router.get("/service-packages")
-async def get_service_packages(
+def get_service_packages(
     category: str = Query(...),
     fuel_type: str = Query("Petrol"),
     brand: str = Query(""),
@@ -35,90 +36,88 @@ async def get_service_packages(
     try:
         # Decode the URL-encoded category
         decoded_category = unquote(category)
-        logger.info(f"Received request: category={decoded_category}, fuel_type={fuel_type}, brand={brand}, model={model}")
         
         # Validate inputs
         valid_fuels = ["Petrol", "Diesel", "CNG", "Electric", "Hybrid"]
         if fuel_type not in valid_fuels:
-            logger.warning(f"Invalid fuel type: {fuel_type}")
             return JSONResponse(
                 status_code=400,
                 content={"message": f"Invalid fuel type. Must be one of {', '.join(valid_fuels)}"}
             )
             
         if not brand or not model:
-            logger.warning("Brand and model are required")
             return JSONResponse(
                 status_code=400,
                 content={"message": "Brand and model are required"}
             )
             
-        # Build query with case-insensitive matching
-        query = {"category": {"$regex": f"^{decoded_category}$", "$options": "i"}}
-        logger.info(f"Executing query: {query}")
+        # OPTIMIZED QUERY:
+        # 1. Filter by Category
+        # 2. Check if the specific Brand -> Model exists in the pricing object
+        query = {
+            "category": {"$regex": f"^{decoded_category}$", "$options": "i"},
+            f"pricing.brands.{brand}.models.{model}": {"$exists": True}
+        }
         
-        # Fetch packages
-        packages = list(db.service_packages.find(query, {"_id": 0}))
-        logger.info(f"Found {len(packages)} packages matching category")
+        # PROJECTION:
+        # Fetch only the fields we need. We don't need the entire pricing table for every car.
+        projection = {
+            "name": 1,
+            "warranty": 1,
+            "interval": 1,
+            "services": 1,
+            "duration": 1,
+            "recommended": 1,
+            "category": 1,
+            "pricing": 1, # We still fetch pricing, but we filtered the docs already
+            "Extra": 1,
+            "Extra1": 1
+        }
         
-        if not packages:
-            logger.warning(f"No packages found for category: {decoded_category}")
-            return JSONResponse(
-                status_code=404,
-                content={"message": f"No packages found for category: {decoded_category}"}
-            )
-            
-        # Transform packages to include only those with pricing for the specified brand and model
+        logger.info(f"Executing optimized query for {decoded_category}, {brand}, {model}")
+        
+        # Executing Sync Query (No 'await')
+        packages = list(db.service_packages.find(query, projection))
+        
         transformed_packages = []
         for pkg in packages:
             try:
-                # Case-insensitive lookup for brand and model
-                brand_lower = brand.lower()
-                model_lower = model.lower()
+                # We know the path exists because of the query, but we use safe getters just in case
+                # Note: We must case-insensitive match or assume DB has exact casing. 
+                # The query above assumes exact casing for keys in dictionary.
                 
-                brands = pkg.get("pricing", {}).get("brands", {})
-                brand_data = next((v for k, v in brands.items() if k.lower() == brand_lower), None)
-                
-                if not brand_data:
-                    logger.debug(f"Brand {brand} not found in package: {pkg['name']}")
-                    continue
-                
-                models = brand_data.get("models", {})
-                model_data = next((v for k, v in models.items() if k.lower() == model_lower), None)
-                
-                if not model_data:
-                    logger.debug(f"Model {model} not found in package: {pkg['name']}")
-                    continue
-                
+                # Navigate deep into the nested structure
+                brand_data = pkg.get("pricing", {}).get("brands", {}).get(brand, {})
+                model_data = brand_data.get("models", {}).get(model, {})
                 fuel_data = model_data.get("fuelTypes", {}).get(fuel_type)
+                
                 if not fuel_data:
-                    logger.debug(f"Fuel type {fuel_type} not found in package: {pkg['name']}")
+                    # Package exists for model, but not for this specific fuel type
                     continue
                 
                 price = fuel_data.get("basePrice", 0)
                 discounted_price = fuel_data.get("discountedPrice", price)
                 
+                # Flatten the structure for the frontend
                 transformed = {
-                    **pkg,
+                    "name": pkg.get("name"),
+                    "warranty": pkg.get("warranty"),
+                    "interval": pkg.get("interval"),
+                    "services": pkg.get("services"),
+                    "duration": pkg.get("duration"),
+                    "recommended": pkg.get("recommended"),
+                    "category": pkg.get("category"),
                     "price": price,
                     "discountedPrice": discounted_price,
-                    "Extra": fuel_data.get("Extra", ""),
-                    "Extra1": fuel_data.get("Extra1", "") 
+                    "Extra": fuel_data.get("Extra", pkg.get("Extra", "")),
+                    "Extra1": fuel_data.get("Extra1", pkg.get("Extra1", "")) 
                 }
                 transformed_packages.append(transformed)
-                logger.info(f"Included package: {pkg['name']} for {brand} {model} ({fuel_type})")
+                
             except (KeyError, TypeError) as e:
-                logger.debug(f"Error processing package {pkg.get('name', 'unknown')}: {str(e)}")
+                logger.error(f"Error processing package {pkg.get('name')}: {e}")
                 continue
             
-        if not transformed_packages:
-            logger.warning(f"No packages found for {brand} {model} ({fuel_type}) in category: {decoded_category}")
-            return JSONResponse(
-                status_code=404,
-                content={"message": f"No packages found for {brand} {model} ({fuel_type}) in category: {decoded_category}"}
-            )
-            
-        logger.info(f"Returning {len(transformed_packages)} packages")
         return transformed_packages
         
     except Exception as e:
@@ -126,49 +125,28 @@ async def get_service_packages(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/service-packages")
-async def create_service_package(package: ServicePackage):
+def create_service_package(package: ServicePackage):
     try:
         package_data = package.dict()
-        
-        # Validate pricing structure
-        pricing = package_data.get("pricing", {}).get("brands", {})
-        if not pricing:
-            logger.warning("Invalid pricing structure: no brands provided")
-            raise HTTPException(
-                status_code=400,
-                detail="Pricing must include at least one brand with models and fuel types"
-            )
+        if not package_data.get("pricing", {}).get("brands", {}):
+            raise HTTPException(status_code=400, detail="Pricing must include at least one brand")
         
         result = db.service_packages.insert_one(package_data)
-        logger.info(f"Created package: {package_data['name']} with ID: {result.inserted_id}")
         return {"id": str(result.inserted_id), "message": "Package created successfully"}
     except Exception as e:
         logger.error(f"Error creating package: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/service-packages/{package_name}")
-async def update_service_package(package_name: str, package: ServicePackage):
+def update_service_package(package_name: str, package: ServicePackage):
     try:
         package_data = package.dict()
-        
-        # Validate pricing structure
-        pricing = package_data.get("pricing", {}).get("brands", {})
-        if not pricing:
-            logger.warning("Invalid pricing structure: no brands provided")
-            raise HTTPException(
-                status_code=400,
-                detail="Pricing must include at least one brand with models and fuel types"
-            )
-        
         result = db.service_packages.update_one(
             {"name": package_name},
             {"$set": package_data}
         )
         if result.modified_count == 0:
-            logger.warning(f"Package not found: {package_name}")
             raise HTTPException(status_code=404, detail="Package not found")
-        logger.info(f"Updated package: {package_name}")
         return {"message": "Package updated successfully"}
     except Exception as e:
-        logger.error(f"Error updating package: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

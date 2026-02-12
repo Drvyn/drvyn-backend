@@ -105,7 +105,7 @@ async def add_fuel_type(brand: str, model: str, fuel_type: str):
 # ... (keep other endpoints the same)
 
 @router.get("/brand-logos", response_model=List[dict])
-async def get_brand_logos():
+def get_brand_logos():
     try:
         brands_dir = settings.MEDIA_ROOT / "brands"
         logos = []
@@ -125,7 +125,7 @@ async def get_brand_logos():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/model-images/{brand}", response_model=List[dict])
-async def get_model_images(brand: str):
+def get_model_images(brand: str):
     try:
         models_dir = settings.MEDIA_ROOT / "models"
         images = []
@@ -145,28 +145,9 @@ async def get_model_images(brand: str):
         logger.error(f"Error getting model images: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/fuel-icons", response_model=List[dict])
-async def get_fuel_icons():
-    try:
-        fuels_dir = settings.MEDIA_ROOT / "fuels"
-        icons = []
-        
-        if fuels_dir.exists():
-            for filename in os.listdir(fuels_dir):
-                if not filename.startswith("."):
-                    fuel_type = filename.split(".")[0].capitalize()
-                    icons.append({
-                        "type": fuel_type,
-                        "url": f"{settings.MEDIA_URL}fuels/{filename}"
-                    })
-        
-        return icons
-    except Exception as e:
-        logger.error(f"Error getting fuel icons: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/all-brands", response_model=List[CarBrand])
-async def get_all_brands():
+def get_all_brands():
     try:
         brands = list(db.brands.find({}))
         return brands

@@ -95,7 +95,7 @@ async def login(admin_login: AdminLogin):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/bookings")
-async def get_all_bookings(
+def get_all_bookings(
     skip: int = 0, 
     limit: int = 50,
     status_filter: Optional[str] = None,
@@ -197,7 +197,7 @@ async def get_car_requests(
     return {"requests": requests, "total": total}
 
 @router.get("/dashboard/stats")
-async def get_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
+def get_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
     total_bookings = db.bookings.count_documents({})
     pending_bookings = db.bookings.count_documents({"status": "pending"})
     completed_bookings = db.bookings.count_documents({"status": "completed"})

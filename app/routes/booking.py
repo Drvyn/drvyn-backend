@@ -71,7 +71,7 @@ async def submit_booking(booking: BookingRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/bookings")
-async def get_bookings(phone: str = None):
+def get_bookings(phone: str = None):
     try:
         query = {}
         if phone:

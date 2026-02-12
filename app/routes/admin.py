@@ -27,11 +27,13 @@ class StatusUpdate(BaseModel):
 # Create admin user if not exists
 def create_initial_admin():
     try:
-        admin_exists = db.admin_users.find_one({"username": os.getenv('ADMIN_USERMANE')})
+        username = os.getenv('ADMIN_USERMANE', 'admin')
+        admin_exists = db.admin_users.find_one({"username": username})
         if not admin_exists:
-            hashed_password = bcrypt.hashpw(os.getenv('ADMIN_PASSWORD').encode('utf-8'), bcrypt.gensalt())
+            password = os.getenv('ADMIN_PASSWORD', 'admin123')
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             db.admin_users.insert_one({
-                "username": os.getenv('ADMIN_USERMANE'),
+                "username": username,
                 "password": hashed_password,
                 "role": "admin",
                 "createdAt": datetime.now()
@@ -99,6 +101,7 @@ def get_all_bookings(
     skip: int = 0, 
     limit: int = 50,
     status_filter: Optional[str] = None,
+    current_admin: dict = Depends(get_current_admin)
 ):
     query = {}
     if status_filter:
@@ -128,7 +131,7 @@ async def get_booking(booking_id: str, current_admin: dict = Depends(get_current
 async def update_booking_status(
     booking_id: str, 
     status_update: StatusUpdate,
-    current_admin: dict = Depends(get_current_admin) # <--- ADD THIS to secure the endpoint
+    current_admin: dict = Depends(get_current_admin)
 ):
     try:
         result = db.bookings.update_one(
@@ -136,14 +139,11 @@ async def update_booking_status(
             {"$set": {"status": status_update.status, "updatedAt": datetime.now()}}
         )
         
-        # Check if matched even if not modified (e.g. status was the same)
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Booking not found")
             
         return {"message": "Status updated successfully"}
-    except Exception as e:
-        # Log the error so you can see it in Vercel logs
-        print(f"Error updating status: {str(e)}")
+    except:
         raise HTTPException(status_code=400, detail="Invalid booking ID")
 
 @router.get("/insurance-requests")
@@ -177,12 +177,14 @@ async def update_insurance_request_status(
             {"$set": {"status": status_update.status, "updatedAt": datetime.now()}}
         )
         
-        if result.modified_count == 0:
+        if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Insurance request not found")
             
         return {"message": "Status updated successfully"}
     except:
         raise HTTPException(status_code=400, detail="Invalid insurance request ID")
+
+# --- CAR REQUESTS ENDPOINTS ---
 
 @router.get("/car-requests")
 async def get_car_requests(
@@ -191,14 +193,37 @@ async def get_car_requests(
     current_admin: dict = Depends(get_current_admin)
 ):
     query = {}
-        
     requests = list(db.requests.find(query).sort("createdAt", -1).skip(skip).limit(limit))
     total = db.requests.count_documents(query)
     
     for req in requests:
         req["_id"] = str(req["_id"])
+        # Handle old records missing 'status'
+        if "status" not in req:
+            req["status"] = "new"
         
     return {"requests": requests, "total": total}
+
+# THIS IS THE ENDPOINT THAT WAS MISSING OR NOT DEPLOYED
+@router.put("/car-requests/{request_id}/status")
+async def update_car_request_status(
+    request_id: str, 
+    status_update: StatusUpdate,
+    current_admin: dict = Depends(get_current_admin)
+):
+    try:
+        result = db.requests.update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {"status": status_update.status, "updatedAt": datetime.now()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Request not found")
+            
+        return {"message": "Status updated successfully"}
+    except Exception as e:
+        print(f"Error updating request: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request ID")
 
 @router.get("/dashboard/stats")
 def get_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
@@ -206,7 +231,7 @@ def get_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
     pending_bookings = db.bookings.count_documents({"status": "pending"})
     completed_bookings = db.bookings.count_documents({"status": "completed"})
     
-    # Calculate revenue (sum of all completed bookings)
+    # Calculate revenue
     pipeline = [
         {"$match": {"status": "completed"}},
         {"$group": {"_id": None, "totalRevenue": {"$sum": "$totalPrice"}}}
@@ -214,11 +239,9 @@ def get_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
     revenue_result = list(db.bookings.aggregate(pipeline))
     total_revenue = revenue_result[0]["totalRevenue"] if revenue_result else 0
     
-    # Insurance requests
     total_insurance_requests = db.insurance_requests.count_documents({"type": "insurance_request"})
     pending_insurance_requests = db.insurance_requests.count_documents({"type": "insurance_request", "status": "new"})
     
-    # Car requests
     total_car_requests = db.requests.count_documents({})
     
     return {

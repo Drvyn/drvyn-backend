@@ -11,6 +11,7 @@ from pathlib import Path
 import logging
 import re
 import pytz
+from fastapi import Response
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -102,8 +103,6 @@ async def add_fuel_type(brand: str, model: str, fuel_type: str):
     
     return {"message": f"Fuel type {normalized_fuel} added to {brand} {model}"}
 
-# ... (keep other endpoints the same)
-
 @router.get("/brand-logos", response_model=List[dict])
 def get_brand_logos():
     try:
@@ -155,8 +154,6 @@ def get_all_brands():
         logger.error(f"Error getting all brands: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-from fastapi import Response
-
 @router.post("/submit-request")
 async def submit_request(request: CarRequest, response: Response):
     try:
@@ -166,18 +163,22 @@ async def submit_request(request: CarRequest, response: Response):
             "fuelType": request.fuelType,
             "year": request.year,
             "phone": request.phone,
-            "createdAt": datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")  
-
+            "status": "new", # <--- FIX: Ensure status exists on creation
+            "createdAt": datetime.now(IST_TZ).strftime("%Y-%m-%d %H:%M:%S")
         }
+        
+        # CORS headers
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "POST"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
         
         result = db.requests.insert_one(request_data)
+        
         return {
             "message": "Request submitted successfully",
             "id": str(result.inserted_id)
         }
         
     except Exception as e:
+        logger.error(f"Error submitting request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

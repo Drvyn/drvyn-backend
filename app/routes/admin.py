@@ -54,7 +54,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(hours=24)
+        # CHANGED: Increased expiry to 30 days for persistent login
+        expire = datetime.utcnow() + timedelta(days=30)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -91,6 +92,7 @@ async def login(admin_login: AdminLogin):
                 detail="Incorrect username or password",
             )
         
+        # Token will now last 30 days by default
         access_token = create_access_token(data={"sub": admin_login.username})
         return {"access_token": access_token, "token_type": "bearer"}
     except Exception as e:
@@ -221,21 +223,17 @@ async def update_car_request_status(
         print(f"Error updating request: {e}")
         raise HTTPException(status_code=400, detail="Invalid request ID")
 
-# --- CUSTOMER ENDPOINT (Updated to match TS Interface) ---
 @router.get("/customers")
 def get_customers(current_admin: dict = Depends(get_current_admin)):
     try:
-        # Aggregation pipeline to group by phone number
         pipeline = [
             {
                 "$group": {
                     "_id": "$phone",
                     "phone": {"$first": "$phone"},
                     "totalBookings": {"$sum": 1},
-                    # Assumes totalPrice is stored as a number in MongoDB
                     "totalSpent": {"$sum": "$totalPrice"},
                     "lastSeen": {"$max": "$createdAt"},
-                    # Collect unique vehicles
                     "vehicles": {
                         "$addToSet": {
                             "brand": "$brand",
@@ -243,7 +241,6 @@ def get_customers(current_admin: dict = Depends(get_current_admin)):
                             "year": "$year"
                         }
                     },
-                    # Grab the most recent address found
                     "address": {"$first": "$address"}
                 }
             },
@@ -256,9 +253,9 @@ def get_customers(current_admin: dict = Depends(get_current_admin)):
         for doc in customers_cursor:
             customers.append({
                 "phone": doc["phone"],
-                "name": "Valued Customer", # Placeholder since we don't have separate user names
+                "name": "Valued Customer", 
                 "totalBookings": doc["totalBookings"],
-                "totalRequests": 0, # Placeholder (would require lookup on requests collection)
+                "totalRequests": 0,
                 "lastSeen": doc["lastSeen"],
                 "vehicles": doc["vehicles"],
                 "address": doc.get("address", "")
